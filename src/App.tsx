@@ -18,6 +18,7 @@ export default function App() {
   const [save, setSave] = useState(initial.data);
   const [notice, setNotice] = useState(initial.warning ?? '');
   const [storageError, setStorageError] = useState('');
+  const [storageWarningDismissed, setStorageWarningDismissed] = useState(false);
   const [dialog, setDialog] = useState<'levels' | 'help' | null>(null);
   const [mobilePanel, setMobilePanel] = useState<'map' | 'editor'>('map');
   const [hintCount, setHintCount] = useState(0);
@@ -36,7 +37,7 @@ export default function App() {
   const performing = snapshot.status === 'running' || snapshot.status === 'pausing';
   const statusNames = { idle: '准备好出发', running: '正在执行', pausing: '正在暂停…', paused: '已暂停', finished: runtime.outcome === 'success' ? '挑战完成！' : runtime.status === 'error' ? '一起找找问题' : '执行结束' };
   const completedCount = levels.filter(l => l.mode === 'challenge' && save.completed[l.id]).length;
-  useEffect(() => { setStorageError(saveData(save) ?? ''); }, [save]);
+  useEffect(() => { setStorageError(saveData(save) ?? ''); setStorageWarningDismissed(false); }, [save]);
   useEffect(() => () => { importVersion.current++; }, []);
   const changeSettings = (patch: Partial<Settings>) => { if (patch.sound) enableSound(); setSave(s => ({ ...s, settings: { ...s.settings, ...patch } })); };
   const changeProgram = (next: Program) => {
@@ -79,7 +80,7 @@ export default function App() {
       <div className="header-actions"><span className="course-progress"><Icon name="flag" size={18} />{completedCount}<span>/ 12</span></span><button className="icon-button" onClick={() => changeSettings({ sound: !save.settings.sound })} aria-label={save.settings.sound ? '关闭声音' : '开启声音'} aria-pressed={save.settings.sound}><Icon name={save.settings.sound ? 'sound' : 'mute'} /></button><button className="help-button" aria-label="帮助与设置" onClick={() => setDialog('help')}><Icon name="help" /><span>帮助与设置</span></button></div>
     </header>
     <div className="mobile-tabs" role="tablist" aria-label="工作台视图"><button role="tab" aria-selected={mobilePanel === 'map'} onClick={() => setMobilePanel('map')}><Icon name="map" />机器人地图</button><button role="tab" aria-selected={mobilePanel === 'editor'} onClick={() => setMobilePanel('editor')}><Icon name="blocks" />我的编程板 <span>{countBlocks(program)}</span></button></div>
-    {(notice || storageError) && <div className="notice" role="status"><Icon name="bulb" /><span>{storageError || notice}</span><button className="icon-button" aria-label="关闭提示" onClick={() => { setNotice(''); setStorageError(''); }}><Icon name="close" size={18} /></button></div>}
+    {(notice || (storageError && !storageWarningDismissed)) && <div className="notice" role="status"><Icon name="bulb" /><span>{storageError && !storageWarningDismissed ? storageError : notice}</span><button className="icon-button" aria-label="关闭提示" onClick={() => { setNotice(''); setStorageWarningDismissed(true); }}><Icon name="close" size={18} /></button></div>}
     <main className="workspace">
       <section className={`map-panel ${mobilePanel === 'map' ? 'mobile-visible' : ''}`} aria-label="地图与任务">
         <div className="section-heading"><div><p className="eyebrow"><span className="tiny-dot" />{level.mode === 'free' ? '自由探索 · 没有标准答案' : `${level.chapter} · 第 ${level.number} 关`}</p><h1>{level.title}</h1></div><span className="lesson-stamp">{level.mode === 'free' ? '∞' : String(level.number).padStart(2, '0')}</span></div>

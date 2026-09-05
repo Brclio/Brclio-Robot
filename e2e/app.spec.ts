@@ -114,6 +114,8 @@ test('损坏存档与存储被禁用均显示说明，应用仍可编程运行',
   }, STORAGE_KEY);
   await page.goto('/');
   await expect(page.getByRole('status').filter({ hasText: '没有保存成功' })).toBeVisible();
+  await page.getByLabel('关闭提示', { exact: true }).click();
+  await expect(page.locator('.save-status')).toHaveText('保存遇到问题');
   await page.getByTestId('library-forward').click(); await page.getByLabel('第 1 块移动步数').selectOption('2');
   await page.getByTestId('run').click(); await expect(page.getByTestId('execution-message')).toContainText('你学会了');
 });
