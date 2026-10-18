@@ -11,6 +11,6 @@ export function HelpDialog({ settings, onSettings, onClose }: { settings: Settin
       <label className="toggle-row"><span><strong>声音反馈</strong><small>移动、收集星星与完成时的轻提示</small></span><input type="checkbox" checked={settings.sound} onChange={e => onSettings({ sound: e.target.checked })} /></label>
     </section>
     <div className="data-note"><strong>你的想法，保存在这台浏览器里。</strong><p>草稿、进度和设置保存在当前浏览器，不会自动跨设备同步。清除浏览器数据可能丢失进度，请用「导出」备份每关程序。本应用不要求姓名或手机号，不添加追踪脚本。</p></div>
-    <p className="design-credit">原创机器人与课程：Brclio Robot<br />界面基于 <a href="https://github.com/esthersjw/esther-design-system" target="_blank" rel="noreferrer">ESTHER不二 · esther-design-system</a> 改编，设计改编遵循 CC BY-NC-SA 4.0。</p>
+    <p className="design-credit">原创机器人与课程：Brclio Robot<br />界面基于 <a href="https://github.com/Brclio/brclio-design-system" target="_blank" rel="noreferrer">Brclio · brclio-design-system</a> 改编，设计改编遵循 CC BY-NC-SA 4.0。</p>
   </Modal>;
 }
