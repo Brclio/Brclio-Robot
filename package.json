@@ -18,7 +18,7 @@
     "dev:full": "concurrently -k -n api,web \"npm run dev:server\" \"npm run dev -- --port 5174 --strictPort\"",
     "start": "node --env-file-if-exists=.env.local server/index.mjs",
     "test:server": "node --test server/*.test.mjs",
-    "dev:cloudflare": "npm run build && wrangler pages dev dist",
+    "dev:cloudflare": "npm run build && wrangler pages dev dist --compatibility-date 2026-10-25 --compatibility-flags nodejs_compat",
     "deploy:cloudflare": "npm run build && wrangler pages deploy dist --project-name brclio-robot",
     "test:worker": "node --test worker/*.test.mjs"
   },

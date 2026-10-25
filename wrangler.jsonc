@@ -1,9 +1,0 @@
-{
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "brclio-robot",
-  "pages_build_output_dir": "./dist",
-  "compatibility_date": "2026-10-25",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ]
-}

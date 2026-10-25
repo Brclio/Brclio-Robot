@@ -52,7 +52,7 @@ Cloudflare Pages 提供 Vite 构建文件，Pages Functions 提供账号 API；�
 
 `AUTH_SECRET` 用于保护密码和验证码，不能复用邮箱密码；更换它应作为认证凭据迁移处理。GitHub App 下载的私钥如为 `BEGIN RSA PRIVATE KEY`，先转换为 PKCS#8，再完整保存 PEM 的起止行和换行。
 
-Pages 的生产运行变量保存在项目 `deployment_configs.production.env_vars`，类型为 `plain_text`。仓库的 Wrangler 配置声明构建输出 `pages_build_output_dir=./dist`、兼容日期和 `nodejs_compat`；实际凭据由 Pages 项目配置管理。`.env.local` 仅用于本机，不随部署自动上传。
+Pages 的生产运行变量保存在项目 `deployment_configs.production.env_vars`，类型为 `plain_text`。构建输出 `dist/`、兼容日期 `2026-10-25` 和 `nodejs_compat` 在 Pages 项目配置中维护。仓库不放根级 Wrangler 配置，避免 Git 构建时用空 `vars` 覆盖控制台中的明文变量。`.env.local` 仅用于本机，不随部署自动上传。
 
 Google Web OAuth 客户端的正式重定向 URI 为：
 
