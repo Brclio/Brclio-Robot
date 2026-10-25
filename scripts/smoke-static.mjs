@@ -10,7 +10,7 @@ const server = createServer(async (request, response) => {
   if (pathname.startsWith('/robot/')) pathname = pathname.slice('/robot'.length);
   const file = resolve(directory, `.${pathname.endsWith('/') ? `${pathname}index.html` : pathname}`);
   if (!file.startsWith(`${directory}${sep}`)) { response.writeHead(403).end(); return; }
-  try { response.writeHead(200, { 'content-type': mime[extname(file)] ?? 'application/octet-stream' }); response.end(await readFile(file)); }
+  try { const body = await readFile(file); response.writeHead(200, { 'content-type': mime[extname(file)] ?? 'application/octet-stream' }); response.end(body); }
   catch { response.writeHead(404).end(); }
 });
 await new Promise(done => server.listen(0, '127.0.0.1', done));
@@ -22,7 +22,8 @@ try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 960 } });
     const errors = [], failed = [], external = [];
     page.on('pageerror', error => errors.push(error.message));
-    page.on('response', response => { if (response.status() >= 400) failed.push(response.url()); });
+    // Pure static hosting deliberately has no account API; guests can still play and save.
+    page.on('response', response => { if (response.status() >= 400 && !(response.status() === 404 && response.url() === `${origin}/api/auth/session`)) failed.push(response.url()); });
     page.on('request', request => { if (!request.url().startsWith(origin)) external.push(request.url()); });
     await page.goto(`${origin}${path}`);
     await page.getByTestId('library-forward').click();

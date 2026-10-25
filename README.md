@@ -1,10 +1,10 @@
 # Brclio Robot · Brclio 编程机器人
 
-可以实际摆放指令、运行机器人并判断结果的浏览器编程工作台。原创机器人「布布」、12 个教学关卡和自由练习场，不需要实体硬件或后端。默认简体中文，数据保存在当前浏览器。
+可以实际摆放指令、运行机器人并判断结果的浏览器编程工作台。原创机器人「布布」、12 个教学关卡和自由练习场，不需要实体硬件。默认简体中文，游客数据保存在浏览器，登录后合并历史并按需同步到账号。正式站点使用 Cloudflare Pages + Functions 提供邮箱注册、密码登录与 Google 登录，账号数据通过 GitHub App 保存在独立私有仓库；本地也可运行 Node.js 账号服务。
 
 ## 安装与运行
 
-建议 **Node.js 24 LTS**（`.nvmrc`），最低 Node.js 22.12.0。此次实际验证环境为 Node.js 26.5.0 / npm 11.17.0。
+建议 **Node.js 24 LTS**（`.nvmrc`），最低 Node.js 24.0.0（账号服务使用内置 SQLite）。此次实际验证环境为 Node.js 26.5.0 / npm 11.17.0。
 
 ```bash
 # 如使用 nvm
@@ -12,6 +12,7 @@ nvm use
 
 npm ci
 npm run dev -- --port 5174 --strictPort
+# 同时启用账号 API：先配置 .env.local，再运行 npm run dev:full
 ```
 
 打开终端中显示的地址，指定以上端口时是 `http://127.0.0.1:5174`。默认 `npm run dev` 使用 Vite 默认端口；若被占用会选择下一个端口。当前机器的 5173 已被其他项目使用，本项目验收端口为 5174。
@@ -20,6 +21,8 @@ npm run dev -- --port 5174 --strictPort
 npm run typecheck             # 严格 TypeScript 检查
 npm test                      # 解释器、播放器、编辑算法、关卡、存储单元测试
 npm run test:watch            # 开发时持续运行单元测试
+npm run test:server           # 账号、验证码、安全、同步 API 集成测试
+npm run test:worker           # Worker、GitHub 数据存储及邮件测试
 npx playwright install chromium
 npm run test:e2e              # 桌面 Chromium + 触屏 Chromium 浏览器测试
 npm run build                # 类型检查 + 生产构建，产物 dist/
@@ -29,7 +32,7 @@ node scripts/smoke-static.mjs # 生产包根路径/子路径实际通关检查
 
 所有直接依赖均锁定精确版本，`package-lock.json` 锁定完整依赖树。浏览器测试配置会启动项目的 5174 服务；已有本项目开发服务时复用，CI 时使用独立服务。不要把其他应用运行在测试端口。
 
-实际验收结果：**125 项单元测试、70 项浏览器测试全部通过**，类型检查、生产构建、生产根路径/子目录运行检查通过。详细映射及未执行项目见 [验收记录](docs/ACCEPTANCE.md)。
+初版验收结果和覆盖范围见 [验收记录](docs/ACCEPTANCE.md)。正式部署见 [Cloudflare 全站部署](docs/CLOUDFLARE_DEPLOYMENT.md)，本地账号配置与同步规则见 [账号服务说明](docs/ACCOUNT_SETUP.md)；最新验证结果以本次执行输出为准。
 
 ## 开始玩
 
@@ -48,9 +51,9 @@ node scripts/smoke-static.mjs # 生产包根路径/子路径实际通关检查
 - 稳定节点 ID、按数组顺序执行、拖拽插入/排序/跨容器移动、点击编辑、参数、复制删除、清空确认、撤销重做。
 - 串行运行、暂停/继续、原子单步、立即重置与切关取消；当前积木、调用路径、多格进度与循环轮次反馈；0.5/1/2 倍速度。
 - 12 个分阶段教学关卡、真实解释器验证的全部参考解、分级提示、自由练习。
-- 逐关草稿、通关记录、声音/速度/轨迹/减少动画设置的本地保存；严格 JSON 导入、下载导出、存储异常恢复提示。
+- 逐关草稿、通关记录和通关积木快照的本地保存；邮箱验证码注册、密码登录、Google 登录与账号云同步；5 秒防抖、至少 30 秒提交间隔、无空闲轮询、离线待同步缓存、账号隔离。声音/速度/轨迹/减少动画设置保留在本设备；严格 JSON 导入导出与存储异常恢复提示。
 - 200 节点上限、统一 2000 次解释推进预算；指令/参数/函数引用/递归/关卡限制等运行前校验。
-- 响应式布局、48px 主要操作按钮、键盘焦点、原生对话框焦点约束、减少动画、无追踪脚本和个人信息表单。
+- 响应式布局、48px 主要操作按钮、键盘焦点、原生对话框焦点约束、减少动画、无追踪脚本；账号登录仅使用邮箱。
 
 ## 项目结构与扩展
 
@@ -60,6 +63,9 @@ src/
   features/editor/     编程板、拖拽与纯树编辑算法
   features/simulator/  SVG 地图、播放 hook、声音、调用路径显示
   features/levels/     关卡选择
+  features/auth/       登录、注册、账号对话框与 API
+  features/sync/       本地缓存、登录合并与低频同步
+  shared/              前后端共用的进度校验与合并
   engine/              校验器、惰性解释器、串行播放器
   data/                关卡及参考程序
   storage/             本地保存、恢复、JSON 导入导出
@@ -68,6 +74,9 @@ src/
   tests/               核心验收单元测试
   App.tsx              应用组合与跨模块协调
   main.tsx             启动、StrictMode、异常边界
+server/                Node HTTP、SQLite、SMTP、Google OAuth 与集成测试
+worker/                共享账号 API、GitHub 数据存储与邮件发送
+functions/             Pages Functions 的 /api 路由入口
 e2e/                   真实浏览器验收
 docs/                  架构、扩展、设计和测试记录
 public/favicon.svg     本地原创图标
@@ -80,19 +89,28 @@ public/favicon.svg     本地原创图标
 
 新增关卡时在 `src/data/levels.ts` 增加地图、白名单、任务、提示和参考程序，然后运行关卡测试。新增指令必须同时扩展类型、严格校验、解释器、编辑器与测试；不要只添加一个按钮。详见扩展文档中的可运行例子。
 
-## 静态部署
+## Cloudflare 全站部署
 
-运行 `npm ci && npm run build` 后，将 **dist 目录内全部文件**部署到任意静态托管，例如 GitHub Pages、Cloudflare Pages、Netlify，或自己的 Web 服务器。构建采用 `base: './'`，支持站点根目录及子目录部署；没有后端 API、环境密钥或数据库。
+正式站点为 `https://bubu.brclio.com`。Cloudflare Pages 项目 `brclio-robot` 提供 `dist/` 静态资源，Pages Functions 提供 `/api`，账号、会话和通关数据通过 GitHub App 保存在私有仓库 `BrclioData/Brclio-Robot-Data`。源码继续使用 `Brclio/Brclio-Robot` 的 `main` 分支，由 Pages 原生 GitHub 集成构建和发布。
+
+```bash
+npm run build
+npx wrangler pages deploy dist --project-name brclio-robot
+```
+
+GitHub App 安装、数据仓库权限、Google 回调、域名和自动部署设置见 [Cloudflare 全站部署](docs/CLOUDFLARE_DEPLOYMENT.md)。按当前维护约定，正式运行变量在 Pages 的 Production 环境以 Plaintext 保存；实际凭据不写入源码仓库，Preview 不配置生产凭据。`.env.local` 只用于本地开发。
+
+如只需要游客模式，仍可将 `dist/` 部署到任意静态托管。构建采用 `base: './'`，游客模式支持根目录及子目录；静态目录本身不提供账号 API。本地 Node 服务的运行方式见 [账号服务说明](docs/ACCOUNT_SETUP.md)。
 
 本项目不使用路径路由，不需要 SPA 路由重写。部署后通过 HTTP/HTTPS 访问，不能直接双击 `dist/index.html` 使用 `file://`。本地验证生产版用 `npm run preview`。需要在同一 Wi-Fi 的平板访问开发版时，可执行 `npm run dev -- --host 0.0.0.0 --port 5174`，再用电脑的局域网地址访问。
 
-所有核心图像、图标和声音均在本地绘制/合成，无外部图片或字体请求。首次加载需要能访问托管站点；没有安装离线 PWA 或 Service Worker。
+所有核心图像、图标和声音均在本地绘制/合成，无外部图片或字体请求。Google 登录按用户操作访问 Google OAuth 服务；验证码由服务端 SMTP 发送。首次加载需要能访问托管站点；没有安装离线 PWA 或 Service Worker。
 
 ## 范围与已知限制
 
-- 按第一版范围，不提供账号、付费、排行榜、多人同步、硬件连接、AI 聊天、后台或云数据库。
+- 账号与同步已补充；不提供付费、排行榜、多人实时协作、硬件连接或 AI 聊天。
 - 暂无可视化地图编辑器；自由练习为固定 8×8 地图。开发者可以通过关卡数据增加其他 4–12 格地图。
-- 每关草稿和设置只保存在当前浏览器；导出是当前关卡的程序备份，不包含整套进度。清理浏览器数据会丢失本地草稿，无法自动跨设备同步。
+- 游客记录只保存在当前浏览器，登录账号后同步草稿、完成记录与通关积木快照；设备设置仍仅保存在本地。导出是当前关卡程序备份，不包含整套进度。清理浏览器数据会丢失尚未确认同步的本地修改。
 - 撤销历史最多保留 50 次编辑，刷新、切关或导入后重新建立。草稿可以是不完整程序；导入必须符合当前关卡与安全规则，未定义函数及递归程序不能导入。
 - 积木统计包含主程序和定义区中的全部积木，每个循环/调用块计一块，定义体计一次，不按执行次数展开。某些课程可用多种算法完成，不强制使用参考解。
 - 长程序与函数区域需要纵向滚动，定义区和调用积木均保持高亮；运行区同时显示完整调用位置。
@@ -101,7 +119,7 @@ public/favicon.svg     本地原创图标
 
 ## API 与设计来源
 
-实现使用 React 19.2.8、Vite 8.2.2、TypeScript 7.0.2、dnd-kit React 0.5.0、Vitest 5.0.0、Playwright 1.63.0，并核对实际安装包的类型定义及官方文档：
+实现使用 React 19.2.8、Vite 8.2.4、TypeScript 7.0.2、dnd-kit React 0.5.0、Vitest 5.0.5、Playwright 1.63.0，并核对实际安装包的类型定义及官方文档：
 
 - [React effect 生命周期与清理](https://react.dev/reference/react/useEffect)
 - [Vite 环境要求与构建入口](https://vite.dev/guide/)

@@ -7,9 +7,12 @@ import { ProgramEditor } from './features/editor/ProgramEditor';
 import { RobotMap } from './features/simulator/RobotMap';
 import { usePlayer } from './features/simulator/usePlayer';
 import { ExecutionBreadcrumb } from './features/simulator/ExecutionBreadcrumb';
+import { AuthDialog, AccountIcon } from './features/auth/AuthDialog';
+import { ApiError, request, type AuthUser, type AuthCapabilities } from './features/auth/api';
+import { useProgressSync } from './features/sync/useProgressSync';
 import { enableSound } from './features/simulator/sound';
 import { levels, getLevel } from './data/levels';
-import { loadSave, saveData, importProgram, exportProgram } from './storage';
+import { loadSave, importProgram, exportProgram } from './storage';
 import { countBlocks } from './engine';
 import { emptyProgram, type Settings, type Program } from './types';
 
@@ -17,27 +20,54 @@ export default function App() {
   const [initial] = useState(() => loadSave(levels));
   const [save, setSave] = useState(initial.data);
   const [notice, setNotice] = useState(initial.warning ?? '');
-  const [storageError, setStorageError] = useState('');
   const [storageWarningDismissed, setStorageWarningDismissed] = useState(false);
-  const [dialog, setDialog] = useState<'levels' | 'help' | null>(null);
+  const [dialog, setDialog] = useState<'levels' | 'help' | 'auth' | null>(null);
+  const [user, setUser] = useState<AuthUser | null | undefined>(undefined);
+  const [capabilities, setCapabilities] = useState<AuthCapabilities>({ email: false, google: false });
   const [mobilePanel, setMobilePanel] = useState<'map' | 'editor'>('map');
   const [hintCount, setHintCount] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const importVersion = useRef(0);
+  const sessionVersion = useRef(0);
   const level = getLevel(save.currentLevel);
   const program = save.drafts[level.id] ?? emptyProgram();
   const player = usePlayer(level, save.settings, snapshot => {
     setSave(current => ({ ...current, completed: { ...current.completed, [level.id]: {
-      completedAt: new Date().toISOString(), blocks: countBlocks(program), actions: snapshot.runtime.actions,
+      completedAt: new Date().toISOString(), blocks: countBlocks(program), actions: snapshot.runtime.actions, program: structuredClone(program),
     } } }));
   });
   const { snapshot, resetKey } = player;
   const { runtime } = snapshot;
   const locked = ['running', 'pausing', 'paused'].includes(snapshot.status);
   const performing = snapshot.status === 'running' || snapshot.status === 'pausing';
+  const sync = useProgressSync({ save, setSave, userId: user?.id ?? (user === undefined ? undefined : null), canApply: !locked,
+    onBeforeApply: () => { importVersion.current++; player.reset(); },
+  });
+  const { storageError } = sync;
   const statusNames = { idle: '准备好出发', running: '正在执行', pausing: '正在暂停…', paused: '已暂停', finished: runtime.outcome === 'success' ? '挑战完成！' : runtime.status === 'error' ? '一起找找问题' : '执行结束' };
   const completedCount = levels.filter(l => l.mode === 'challenge' && save.completed[l.id]).length;
-  useEffect(() => { setStorageError(saveData(save) ?? ''); setStorageWarningDismissed(false); }, [save]);
+  useEffect(() => { setStorageWarningDismissed(false); }, [save, storageError]);
+  useEffect(() => {
+    let active = true;
+    const version = ++sessionVersion.current;
+    void request<{ user: AuthUser | null; capabilities: AuthCapabilities }>('/auth/session').then(result => {
+      if (active && version === sessionVersion.current) { setUser(result.user); setCapabilities(result.capabilities); }
+    }).catch(() => { if (active && version === sessionVersion.current) setUser(null); });
+    const url = new URL(window.location.href);
+    const error = url.searchParams.get('auth_error');
+    if (error) {
+      const messages: Record<string, string> = {
+        google_state: 'Google 登录已过期，请重新点击登录。',
+        google_cancelled: '已取消 Google 登录，你可以继续编程。',
+        google_failed: 'Google 登录暂时没有完成，请稍后重试。',
+        google_link_required: '这个邮箱已有账号，请先使用邮箱和密码登录。',
+      };
+      setNotice(messages[error] ?? 'Google 登录没有完成，请重试。');
+      url.searchParams.delete('auth_error');
+      window.history.replaceState(null, '', url);
+    }
+    return () => { active = false; };
+  }, []);
   useEffect(() => () => { importVersion.current++; }, []);
   const changeSettings = (patch: Partial<Settings>) => { if (patch.sound) enableSound(); setSave(s => ({ ...s, settings: { ...s.settings, ...patch } })); };
   const changeProgram = (next: Program) => {
@@ -52,6 +82,28 @@ export default function App() {
     setDialog(null); setHintCount(0); setNotice(''); setMobilePanel('map');
   };
   const reset = () => { importVersion.current++; player.reset(); setNotice(''); };
+  const authenticated = (account: AuthUser) => { sessionVersion.current++; reset(); setUser(account); };
+  const logout = async () => {
+    await sync.prepareLogout();
+    try { await request('/auth/logout', {}, 'POST', { 'X-Brclio-User-Id': user?.id ?? '' }); }
+    catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        const session = await request<{ user: AuthUser | null; capabilities: AuthCapabilities }>('/auth/session');
+        sessionVersion.current++; reset(); setUser(session.user); setCapabilities(session.capabilities);
+      }
+      throw error;
+    }
+    sessionVersion.current++; reset(); setUser(null);
+  };
+  const openAccount = () => {
+    setDialog('auth');
+    const version = ++sessionVersion.current;
+    void request<{ user: AuthUser | null; capabilities: AuthCapabilities }>('/auth/session').then(result => {
+      if (version !== sessionVersion.current) return;
+      setCapabilities(result.capabilities);
+      if (result.user?.id !== user?.id || user === undefined) { reset(); setUser(result.user); }
+    }).catch(() => { if (version === sessionVersion.current && user === undefined) setUser(null); });
+  };
   const run = () => { importVersion.current++; setNotice(''); player.run(program); setMobilePanel('map'); };
   const exportFile = () => {
     const blob = new Blob([exportProgram(program, level.id)], { type: 'application/json' });
@@ -77,7 +129,7 @@ export default function App() {
     <header className="app-header">
       <div className="brand" aria-label="Brclio 编程机器人工作台"><RobotMark /><span><strong>Brclio <em>Robot</em></strong><small>Brclio 编程机器人</small></span><span className="brand-divider" /></div>
       <button className="level-selector" onClick={() => setDialog('levels')} data-testid="open-levels"><span className="level-selector-icon"><Icon name="map" /></span><span>{level.mode === 'free' ? '自由练习场' : `第 ${String(level.number).padStart(2, '0')} 关`}<strong>{level.mode === 'free' ? '让想法自由走走' : level.title}</strong></span><Icon name="chevron" size={18} /></button>
-      <div className="header-actions"><span className="course-progress"><Icon name="flag" size={18} />{completedCount}<span>/ 12</span></span><button className="icon-button" onClick={() => changeSettings({ sound: !save.settings.sound })} aria-label={save.settings.sound ? '关闭声音' : '开启声音'} aria-pressed={save.settings.sound}><Icon name={save.settings.sound ? 'sound' : 'mute'} /></button><button className="help-button" aria-label="帮助与设置" onClick={() => setDialog('help')}><Icon name="help" /><span>帮助与设置</span></button></div>
+      <div className="header-actions"><button className="account-button" onClick={openAccount} aria-label={user ? "我的账号与进度" : "登录或注册"}><AccountIcon /><span className="account-button-label">{user ? "我的账号" : "登录 / 注册"}</span></button><span className="course-progress"><Icon name="flag" size={18} />{completedCount}<span>/ 12</span></span><button className="icon-button" onClick={() => changeSettings({ sound: !save.settings.sound })} aria-label={save.settings.sound ? '关闭声音' : '开启声音'} aria-pressed={save.settings.sound}><Icon name={save.settings.sound ? 'sound' : 'mute'} /></button><button className="help-button" aria-label="帮助与设置" onClick={() => setDialog('help')}><Icon name="help" /><span>帮助与设置</span></button></div>
     </header>
     <div className="mobile-tabs" role="tablist" aria-label="工作台视图"><button role="tab" aria-selected={mobilePanel === 'map'} onClick={() => setMobilePanel('map')}><Icon name="map" />机器人地图</button><button role="tab" aria-selected={mobilePanel === 'editor'} onClick={() => setMobilePanel('editor')}><Icon name="blocks" />我的编程板 <span>{countBlocks(program)}</span></button></div>
     {(notice || (storageError && !storageWarningDismissed)) && <div className="notice" role="status"><Icon name="bulb" /><span>{storageError && !storageWarningDismissed ? storageError : notice}</span><button className="icon-button" aria-label="关闭提示" onClick={() => { setNotice(''); setStorageWarningDismissed(true); }}><Icon name="close" size={18} /></button></div>}
@@ -100,7 +152,7 @@ export default function App() {
         {hintCount > 0 && <div className="hint-content">{level.hints.slice(0, hintCount).map((hint, i) => <p key={hint}><b>{i + 1}</b>{hint}</p>)}{hintCount === level.hints.length && <button className="text-button" disabled={locked} onClick={() => { if (countBlocks(program) === 0 || window.confirm('使用参考解会替换当前程序。要试试这份参考解吗？')) { changeProgram(structuredClone(level.solution)); setMobilePanel('editor'); } }}>把参考解放到编程板 <Icon name="arrow" size={16} /></button>}</div>}
       </section>
       <section className={`program-panel ${mobilePanel === 'editor' ? 'mobile-visible' : ''}`} aria-label="编程工作台">
-        <div className="program-panel-heading"><div><p className="eyebrow">想一想，摆一摆</p><h2>我的编程板 <span className="pencil-line" /></h2></div><span className={`save-status ${storageError ? 'save-error' : ''}`}><span className="tiny-dot" />{storageError ? '保存遇到问题' : '已保存在此浏览器'}</span></div>
+        <div className="program-panel-heading"><div><p className="eyebrow">想一想，摆一摆</p><h2>我的编程板 <span className="pencil-line" /></h2></div><span className={`save-status ${storageError ? 'save-error' : ''}`}><span className="tiny-dot" />{storageError ? '保存遇到问题' : user ? sync.status : '已保存在此浏览器'}</span></div>
         <ProgramEditor key={level.id} level={level} program={program} onChange={changeProgram} locked={locked} active={runtime.active} errorBlockId={runtime.status === 'error' ? runtime.active?.blockId : undefined} onNotice={setNotice} />
         <div className="player-console">
           <div className="player-topline"><span className={`runtime-indicator ${snapshot.status}`}><span className="tiny-dot" />{statusNames[snapshot.status]}</span><label className="speed-control">速度<select aria-label="播放速度" value={save.settings.speed} onChange={e => changeSettings({ speed: Number(e.target.value) as Settings['speed'] })}><option value="0.5">0.5 ×</option><option value="1">1 ×</option><option value="2">2 ×</option></select></label></div>
@@ -115,6 +167,7 @@ export default function App() {
     </main>
     <footer className="app-footer"><span>Brclio Robot <i>·</i> 小小积木，大大想法。</span><button onClick={() => setDialog('help')}>本地保存与使用说明 <Icon name="arrow" size={14} /></button></footer>
     {dialog === 'levels' && <LevelPicker levels={levels} current={level.id} completed={save.completed} onSelect={chooseLevel} onClose={() => setDialog(null)} />}
+    {dialog === 'auth' && <AuthDialog user={user ?? null} capabilities={capabilities} onClose={() => setDialog(null)} onAuthenticated={authenticated} onLogout={logout} syncStatus={sync.status} onRetrySync={sync.retry} />}
     {dialog === 'help' && <HelpDialog settings={save.settings} onSettings={changeSettings} onClose={() => setDialog(null)} />}
   </div>;
 }

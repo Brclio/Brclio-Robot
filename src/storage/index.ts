@@ -27,7 +27,7 @@ function freshSave(levels: Level[]): SaveData {
 }
 
 function validCompletion(value: unknown): value is CompletionRecord {
-  return record(value) && exactKeys(value, ['completedAt', 'blocks', 'actions'])
+  return record(value) && exactKeys(value, value.program === undefined ? ['completedAt', 'blocks', 'actions'] : ['completedAt', 'blocks', 'actions', 'program'])
     && typeof value.completedAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value.completedAt)
     && value.completedAt.length < 40 && Number.isFinite(Date.parse(value.completedAt))
     && Number.isInteger(value.blocks) && (value.blocks as number) >= 1 && (value.blocks as number) <= 200
@@ -35,11 +35,11 @@ function validCompletion(value: unknown): value is CompletionRecord {
 }
 
 /** Every lesson owns its own draft; a damaged entry cannot erase another lesson. */
-export function loadSave(levels: Level[]): { data: SaveData; warning?: string } {
+export function loadSave(levels: Level[], key = STORAGE_KEY): { data: SaveData; warning?: string } {
   const data = freshSave(levels);
   const damaged = new Set<string>();
   try {
-    const raw = globalThis.localStorage.getItem(STORAGE_KEY);
+    const raw = globalThis.localStorage.getItem(key);
     if (raw === null) return { data };
     if (raw.length > MAX_SAVE_CHARACTERS) return { data, warning: '本地存档太大，暂时无法读取。已打开新草稿，你可以导入之前的程序备份。' };
     const parsed: unknown = JSON.parse(raw);
@@ -67,7 +67,9 @@ export function loadSave(levels: Level[]): { data: SaveData; warning?: string } 
 
     if (record(parsed.completed)) {
       for (const [id, value] of Object.entries(parsed.completed)) {
-        if (levelMap.get(id)?.mode === 'challenge' && validCompletion(value)) data.completed[id] = { ...value };
+        const level = levelMap.get(id);
+        if (level?.mode === 'challenge' && validCompletion(value)
+          && (value.program === undefined || validateProgram(value.program, level).length === 0)) data.completed[id] = structuredClone(value);
         else damaged.add('部分完成记录');
       }
     } else damaged.add('完成记录');
@@ -95,11 +97,11 @@ export function loadSave(levels: Level[]): { data: SaveData; warning?: string } 
 }
 
 /** Storage may be blocked or full. Report it without interrupting the playground. */
-export function saveData(data: SaveData): string | undefined {
+export function saveData(data: SaveData, key = STORAGE_KEY): string | undefined {
   try {
     const json = JSON.stringify(data);
     if (json.length > MAX_SAVE_CHARACTERS) return '本地存档太大，暂时无法保存。请先导出重要程序作为备份。';
-    globalThis.localStorage.setItem(STORAGE_KEY, json);
+    globalThis.localStorage.setItem(key, json);
     return undefined;
   } catch {
     return '浏览器没有保存成功，可能是空间不足或禁止了本地存储。当前程序仍在，请用导出按钮备份。';

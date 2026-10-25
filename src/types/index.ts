@@ -31,7 +31,7 @@ export interface RuntimeState {
 export type PlayerStatus = 'idle' | 'running' | 'pausing' | 'paused' | 'finished';
 export interface PlayerSnapshot { status: PlayerStatus; runtime: RuntimeState }
 export interface Settings { sound: boolean; speed: 0.5 | 1 | 2; trail: boolean; reducedMotion: boolean }
-export interface CompletionRecord { completedAt: string; blocks: number; actions: number }
+export interface CompletionRecord { completedAt: string; blocks: number; actions: number; program?: Program }
 export interface SaveData { version: 1; currentLevel: string; drafts: Record<string, Program>; completed: Record<string, CompletionRecord>; settings: Settings }
 export interface EditorState { past: Program[]; present: Program; future: Program[]; selectedId: string | null }
 export interface ProgramFile { version: 1; levelId: string; main: Instruction[]; functions: Record<FunctionId, Instruction[]> }

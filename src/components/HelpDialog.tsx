@@ -10,7 +10,7 @@ export function HelpDialog({ settings, onSettings, onClose }: { settings: Settin
       <label className="toggle-row"><span><strong>减少动画</strong><small>立即显示新位置，执行速度保持不变</small></span><input type="checkbox" checked={settings.reducedMotion} onChange={e => onSettings({ reducedMotion: e.target.checked })} /></label>
       <label className="toggle-row"><span><strong>声音反馈</strong><small>移动、收集星星与完成时的轻提示</small></span><input type="checkbox" checked={settings.sound} onChange={e => onSettings({ sound: e.target.checked })} /></label>
     </section>
-    <div className="data-note"><strong>你的想法，保存在这台浏览器里。</strong><p>草稿、进度和设置保存在当前浏览器，不会自动跨设备同步。清除浏览器数据可能丢失进度，请用「导出」备份每关程序。本应用不要求姓名或手机号，不添加追踪脚本。</p></div>
+    <div className="data-note"><strong>你的想法，随时接着搭。</strong><p>不登录也能使用，草稿和通关记录会保存在浏览器。登录邮箱或 Google 账号后，会合并历史积木与通关记录；后续有变化时批量同步，通常停止编辑 5 秒后提交，提交至少间隔 30 秒。网络中断时保留本地待同步记录。声音、速度等设置保留在这台设备。清除浏览器数据前，请用「导出」备份尚未同步的程序。</p></div>
     <p className="design-credit">原创机器人与课程：Brclio Robot<br />界面基于 <a href="https://github.com/Brclio/brclio-design-system" target="_blank" rel="noreferrer">Brclio · brclio-design-system</a> 改编，设计改编遵循 CC BY-NC-SA 4.0。</p>
   </Modal>;
 }

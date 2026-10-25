@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -13,11 +13,19 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "dev:server": "node --watch --env-file-if-exists=.env.local server/index.mjs",
+    "dev:full": "concurrently -k -n api,web \"npm run dev:server\" \"npm run dev -- --port 5174 --strictPort\"",
+    "start": "node --env-file-if-exists=.env.local server/index.mjs",
+    "test:server": "node --test server/*.test.mjs",
+    "dev:cloudflare": "npm run build && wrangler pages dev dist",
+    "deploy:cloudflare": "npm run build && wrangler pages deploy dist --project-name brclio-robot",
+    "test:worker": "node --test worker/*.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/dom": "0.5.0",
     "@dnd-kit/react": "0.5.0",
+    "nodemailer": "10.2.1",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -27,8 +35,10 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "@vitejs/plugin-react": "6.1.1",
+    "concurrently": "10.0.6",
     "typescript": "7.0.2",
-    "vite": "8.2.2",
-    "vitest": "5.0.0"
+    "vite": "8.2.4",
+    "vitest": "5.0.5",
+    "wrangler": "4.152.0"
   }
 }
