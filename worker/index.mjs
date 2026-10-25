@@ -248,6 +248,9 @@ export function createWorker({ sendEmail = defaultSendEmail, fetchImpl = fetch, 
         if (error.retryAfter) headers.set('Retry-After', String(error.retryAfter));
         return send(error.status, { error: error.message, ...(error.retryAfter ? { retryAfter: error.retryAfter } : {}) });
       }
+      // A bounded diagnostic category helps operators inspect failures without
+      // exposing provider responses, account data, or authentication credentials.
+      if (typeof error?.code === 'string' && /^GITHUB_[A-Z_]+$/.test(error.code)) headers.set('X-Brclio-Error', error.code);
       return send(503, { error: '账号存储暂时不可用，请稍后重试。浏览器中的记录会保留。' });
     }
   } };
