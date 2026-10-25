@@ -6,11 +6,14 @@ Cloudflare Pages 提供 Vite 构建文件，Pages Functions 提供账号 API；�
 | --- | --- |
 | 正式域名 | `https://bubu.brclio.com` |
 | Pages 项目 | `brclio-robot` |
+| Pages 地址 | `https://brclio-robot.pages.dev` |
 | 源码仓库 | `Brclio/Brclio-Robot`，生产分支 `main` |
 | 私有数据仓库 | `BrclioData/Brclio-Robot-Data`，分支 `main` |
 | 前端资源 | `dist/` |
 | 服务端入口 | `functions/api/[[path]].js` |
 | 数据访问身份 | GitHub App，App ID `5467364` |
+
+项目已连接上述 GitHub 源码仓库，`main` 分支推送用于触发生产自动构建。生产运行变量统一为 Plaintext；私有数据仓库的 Installation ID 为 `175141213`。
 
 ## 准备数据仓库与 GitHub App
 
