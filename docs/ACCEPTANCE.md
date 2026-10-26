@@ -2,12 +2,22 @@
 
 这里将需求中的验收案例映射到实际测试。测试断言通过不等于所有设备上都已验证；单元测试、浏览器模拟和真实设备验证分别记录。
 
+## 2026-10-26 正式账号部署验收
+
+正式站点 `https://bubu.brclio.com` 已接入 Cloudflare Pages + Functions，源码连接 `Brclio/Brclio-Robot` 的 `main`，账号数据保存在私有仓库 `BrclioData/Brclio-Robot-Data`。域名和证书验证均为 `active`；DNS 为已代理的 `CNAME bubu → brclio-robot.pages.dev`，生产 16 项环境变量全部为 `plain_text`。
+
+- 正式域名合成冒烟：注册、会话、进度同步、退出、重新登录和测试数据清理全部通过。
+- 当前 39 项 Worker 测试全部通过；此前 145 项应用单元测试、24 项 Node 后端测试、70 项 Playwright 测试通过。
+- 合成冒烟未发送真实邮件、未执行真实 Google 用户授权。真实注册邮件投递、完整 Google consent 与授权回调尚未实测，不包含在上述通过结论中。
+
+部署配置见 [Cloudflare 部署说明](CLOUDFLARE_DEPLOYMENT.md)。下面保留此前开发及初版验收记录。
+
 ## 2026-10-25 账号与同步补充验收
 
-Cloudflare 最终部署采用 Pages + Functions，用户数据改为 GitHub App 访问独立私有数据仓库，生产不依赖 D1。最终本地复验：145 项应用单元测试、24 项 Node 后端测试、38 项 Worker 测试通过，类型检查、生产构建和 Pages Functions 编译通过。原有 70 项浏览器用例已通过。Worker 新增验证覆盖 GitHub 安装令牌、私有仓库边界、SHA 并发写入、实际 workerd 密码/会话处理、原生 SMTP 协议和 Google 身份索引关联。
+Cloudflare 部署采用 Pages + Functions，用户数据改为 GitHub App 访问独立私有数据仓库。当次本地复验：145 项应用单元测试、24 项 Node 后端测试、38 项 Worker 测试通过，类型检查、生产构建和 Pages Functions 编译通过。原有 70 项浏览器用例已通过。Worker 新增验证覆盖 GitHub 安装令牌、私有仓库边界、SHA 并发写入、实际 workerd 密码/会话处理、原生 SMTP 协议和 Google 身份索引关联。
 
 - `npm test`：145 项通过，包括 20 项新增同步测试。
-- `npm run test:server`：23 项通过，覆盖验证码、登录会话、Google OAuth 协议、安全与持久化恢复。
+- `npm run test:server`：24 项通过，覆盖验证码、登录会话、Google OAuth 协议、安全与持久化恢复。
 - `npm run test:e2e`：原有 70 项桌面和模拟触屏用例通过。一次播放器时序断言受自动推进时钟影响失败，独立复验和全量复验均通过，未修改产品执行语义或断言。
 - `npm run build`、类型检查和生产包根路径、`/robot/` 子路径实际通关检查通过；纯静态环境没有账号 API 时，游客功能仍可用。
 - 真实页面使用注入的内存邮件服务跑通：游客通关、获取验证码与冷却、注册、合并通关积木、编辑后延迟提交、第二个浏览器登录恢复、退出恢复游客。120 秒空闲期间无额外同步请求。
@@ -64,12 +74,14 @@ Cloudflare 最终部署采用 Pages + Functions，用户数据改为 GitHub App 
 
 ## 复现命令
 
-在项目根目录使用 Node.js 22.12 或以上版本：
+在当前项目根目录使用 Node.js 24 或以上版本：
 
 ```sh
 npm ci
 npm run typecheck
 npm test
+npm run test:server
+npm run test:worker
 npm run build
 npx playwright install chromium
 npm run test:e2e
@@ -77,8 +89,8 @@ npm run test:e2e
 
 测试使用固定依赖版本和提交的锁文件。若 Playwright 尚未安装浏览器，需要先执行安装命令；安装浏览器成功本身不代表端到端测试通过。若增加其他浏览器项目，需要安装对应浏览器并重新记录执行结果。
 
-## 当前范围与验收限制
+## 初版范围与验收限制
 
-已实现的产品范围是本地浏览器内的关卡编程工作台，没有后端或登录依赖。12 个内置挑战和固定 8 × 8 自由地图均使用同一引擎。程序运行状态不跨刷新续跑，编辑撤销历史不持久化；刷新恢复当前草稿、已完成关卡和设置。导入要求当前关卡 ID 匹配，不自动转换地图或程序版本。
+初版实现的是本地浏览器内的关卡编程工作台，没有后端或登录依赖。12 个内置挑战和固定 8 × 8 自由地图均使用同一引擎。程序运行状态不跨刷新续跑，编辑撤销历史不持久化；刷新恢复当前草稿、已完成关卡和设置。导入要求当前关卡 ID 匹配，不自动转换地图或程序版本。
 
-没有账户、付费、排行榜、多人同步、实体硬件、AI 聊天、后台和云数据库，也没有地图编辑器或任意数量函数。静态资源首次加载需要网络；尚未实现 Service Worker 安装离线缓存。真实设备、Safari/WebKit、Firefox 验收未执行，已在上方明确记录。
+初版未提供账户、付费、排行榜、多人同步、实体硬件、AI 聊天、后台和云数据库，也没有地图编辑器或任意数量函数。账号与历史同步已在后续版本补充，范围见本文顶部的最新验收记录。静态资源首次加载需要网络；尚未实现 Service Worker 安装离线缓存。真实设备、Safari/WebKit、Firefox 验收未执行，已在上方明确记录。

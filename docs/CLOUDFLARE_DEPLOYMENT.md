@@ -13,7 +13,9 @@ Cloudflare Pages 提供 Vite 构建文件，Pages Functions 提供账号 API；�
 | 服务端入口 | `functions/api/[[path]].js` |
 | 数据访问身份 | GitHub App，App ID `5467364` |
 
-项目已连接上述 GitHub 源码仓库，`main` 分支推送用于触发生产自动构建。生产运行变量统一为 Plaintext；私有数据仓库的 Installation ID 为 `175141213`。
+项目已连接上述 GitHub 源码仓库，`main` 分支推送用于触发生产自动构建。生产 16 项运行变量全部为 `plain_text`；私有数据仓库的 Installation ID 为 `175141213`。
+
+2026-10-26 已核验正式域名和证书验证均为 `active`。DNS 为 `CNAME bubu → brclio-robot.pages.dev`，已启用 Cloudflare 代理（`proxied=true`）。
 
 ## 准备数据仓库与 GitHub App
 
@@ -35,6 +37,7 @@ Cloudflare Pages 提供 Vite 构建文件，Pages Functions 提供账号 API；�
 | 名称 | 值或用途 |
 | --- | --- |
 | `APP_ORIGIN` | `https://bubu.brclio.com` |
+| `NODE_VERSION` | `24` |
 | `SMTP_HOST` | `smtp.gmail.com` |
 | `SMTP_PORT` | `465` |
 | `SMTP_USER` | 验证码发件邮箱 |
@@ -100,6 +103,8 @@ GitHub App 安装令牌通常至少有每小时 5,000 次 REST 请求额度，�
 
 ## 发布验证与维护
 
-发布后检查邮箱验证码注册、密码登录、Google 登录、退出、账号间隔离，以及另一浏览器恢复通关积木。`GET /api/auth/session` 应返回 JSON；数据仓库必须保持私有。测试命令和实际结果以当前测试源文件与执行输出为准。
+2026-10-26 正式域名的合成冒烟检查已通过：注册、会话、进度同步、退出、重新登录及测试数据清理结果全部为 `true`。本次检查未发送真实注册邮件，也未执行真实 Google 用户授权；邮件实际投递与完整 Google consent 回调仍需单独验收。
+
+当前 39 项 Worker 测试全部通过；此前 145 项应用单元测试、24 项 Node 后端测试及 70 项 Playwright 测试通过。详细范围见 [验收记录](ACCEPTANCE.md)。
 
 数据恢复使用私有数据仓库的 Git 历史。按账号恢复前先核对文件版本；恢复旧认证状态可能恢复旧会话，因此应同时处理会话失效。回滚 Pages 部署不会自动回滚数据仓库提交。维护时在 Pages 部署详情中查看构建记录和 Functions 实时日志。
