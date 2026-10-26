@@ -39,6 +39,12 @@
 .auth-google { display: flex; width: 100%; min-height: 49px; align-items: center; justify-content: center; gap: 11px; padding: 11px 14px; background: var(--card-bg); border: 1px solid #daddd1; border-radius: 11px; text-decoration: none; color: var(--ink); font-size: 13px; font-weight: 600; transition: background .15s, border-color .15s; }
 .auth-google:hover:not(:disabled):not(.auth-google-disabled) { background: #f3f3e9; border-color: #aab8ad; text-decoration: none; }
 .auth-google-disabled { opacity: .45; cursor: not-allowed; }
+.auth-google[aria-busy='true'] { opacity: 1; cursor: wait; color: var(--blue-dark); background: #edf3f7; border-color: #b8d2e5; }
+.auth-redirect-spinner { width: 18px; height: 18px; flex-shrink: 0; border: 2px solid #cadde9; border-top-color: var(--blue-dark); border-radius: 50%; animation: auth-redirect-spin .85s linear 60; }
+.auth-google-transition { margin-top: 10px; padding: 10px 12px; border-radius: 9px; background: #f6f0db; color: #766331; font-size: 11px; line-height: 1.7; }
+@keyframes auth-redirect-spin { to { transform: rotate(360deg); } }
+.reduce-motion .auth-redirect-spinner { animation: none; }
+@media (prefers-reduced-motion: reduce) { .auth-redirect-spinner { animation: none; } }
 .auth-google > svg { flex-shrink: 0; }
 .auth-google-note { margin-top: 7px; font-size: 10px; text-align: center; color: var(--ink-light); }
 .auth-local-note { display: flex; align-items: flex-start; gap: 8px; font-size: 10px; color: #76806d; border-top: 1px dashed #daddd1; margin-top: 23px; padding-top: 16px; line-height: 1.8; }

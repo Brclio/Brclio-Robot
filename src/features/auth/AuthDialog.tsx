@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react';
 import { Modal } from '../../components/Modal';
 import { Icon } from '../../components/Icon';
 import { RobotMark } from '../../components/RobotMark';
@@ -35,7 +35,7 @@ export function AuthDialog({ user, capabilities, onClose, onAuthenticated, onLog
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [pending, setPending] = useState<'code' | 'submit' | 'logout' | null>(null);
+  const [pending, setPending] = useState<'code' | 'submit' | 'logout' | 'google' | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [resendAt, setResendAt] = useState(0);
@@ -43,7 +43,25 @@ export function AuthDialog({ user, capabilities, onClose, onAuthenticated, onLog
   const emailRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
   const busy = useRef(false);
+  const googleRedirecting = useRef(false);
+  const navigationFrame = useRef<number | null>(null);
+  const googlePending = pending === 'google';
   const remaining = Math.max(0, Math.ceil((resendAt - now) / 1000));
+
+  useEffect(() => {
+    // A back navigation can restore this exact component from the browser cache.
+    const restore = () => {
+      if (!googleRedirecting.current) return;
+      if (navigationFrame.current !== null) window.cancelAnimationFrame(navigationFrame.current);
+      navigationFrame.current = null;
+      googleRedirecting.current = false; busy.current = false; setPending(null);
+    };
+    window.addEventListener('pageshow', restore);
+    return () => {
+      window.removeEventListener('pageshow', restore);
+      if (navigationFrame.current !== null) window.cancelAnimationFrame(navigationFrame.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (resendAt <= Date.now()) return;
@@ -101,6 +119,23 @@ export function AuthDialog({ user, capabilities, onClose, onAuthenticated, onLog
     finally { busy.current = false; setPending(null); }
   };
 
+  const beginGoogleLogin = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (busy.current) { event.preventDefault(); return; }
+    // Keep native new-tab/new-window behavior; only this tab needs a waiting state.
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const target = event.currentTarget.href;
+    googleRedirecting.current = true; busy.current = true;
+    setPending('google'); setError(''); setMessage('');
+    // Paint the transition before the browser starts a document navigation.
+    navigationFrame.current = window.requestAnimationFrame(() => {
+      navigationFrame.current = window.requestAnimationFrame(() => {
+        navigationFrame.current = null;
+        if (googleRedirecting.current) window.location.assign(target);
+      });
+    });
+  };
+
   return <Modal title={user ? '我的账号与进度' : '记录每一次探索'} onClose={onClose}>
     <div className="auth-dialog">
       {user ? <>
@@ -122,7 +157,8 @@ export function AuthDialog({ user, capabilities, onClose, onAuthenticated, onLog
           <button type="submit" className="auth-submit" disabled={pending !== null || (mode === 'register' && !capabilities.email)}>{pending === 'submit' ? (mode === 'register' ? '正在创建账号…' : '正在登录…') : mode === 'register' ? '注册并同步进度' : '登录并同步进度'}<Icon name="arrow" size={19} /></button>
         </form>
         <div className="auth-divider"><span>也可以</span></div>
-        {capabilities.google ? <a className={`auth-google ${pending !== null ? 'auth-google-disabled' : ''}`} aria-disabled={pending !== null} href={`/api/auth/google?returnTo=${encodeURIComponent(window.location.pathname)}`} onClick={event => { if (pending !== null) event.preventDefault(); }}><GoogleIcon /><span>使用 Google 继续</span></a> : <><button type="button" className="auth-google" disabled><GoogleIcon />使用 Google 继续</button><p className="auth-google-note">Google 登录正在准备中</p></>}
+        {capabilities.google ? <a className={`auth-google ${pending !== null ? 'auth-google-disabled' : ''}`} aria-disabled={pending !== null} aria-busy={googlePending} href={`/api/auth/google?returnTo=${encodeURIComponent(window.location.pathname)}`} onClick={beginGoogleLogin}>{googlePending ? <span className="auth-redirect-spinner" aria-hidden="true" /> : <GoogleIcon />}<span>{googlePending ? '正在跳转至 Google…' : '使用 Google 继续'}</span></a> : <><button type="button" className="auth-google" disabled><GoogleIcon />使用 Google 继续</button><p className="auth-google-note">Google 登录正在准备中</p></>}
+        {googlePending && <p className="auth-google-transition" role="status">正在打开 Google 登录页，请稍候。选择账号后会自动返回。</p>}
         <p className="auth-local-note"><Icon name="check" size={17} /><span>不登录也能玩。历史记录先留在浏览器，登录后自动合并；有新变化时再批量同步。</span></p>
       </>}
     </div>
