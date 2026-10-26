@@ -94,11 +94,14 @@ export function createGitHubStore(env, { fetchImpl = fetch, now = Date.now } = {
   async function api(path, credential, { method = 'GET', body } = {}) {
     const abort = new AbortController(), timer = setTimeout(() => abort.abort(), TIMEOUT);
     try {
-      const response = await fetchImpl(API + path, { method, redirect: 'error', credentials: 'omit', cache: 'no-store', signal: abort.signal,
+      const response = await fetchImpl(API + path, { method, redirect: 'manual', credentials: 'omit', cache: 'no-store', signal: abort.signal,
         headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${credential}`, 'X-GitHub-Api-Version': VERSION,
           'User-Agent': 'Brclio-Robot-Data-Store', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
+      // Workers supports manual redirects, not redirect:'error'. Never follow a
+      // redirect with an App JWT or installation token, even to another GitHub URL.
+      if (response.status >= 300 && response.status < 400) fail('GITHUB_REDIRECT');
       let bytes = 0, raw = '', reader;
       const decoder = new TextDecoder();
       if (Number(response.headers.get('Content-Length')) > MAX_RESPONSE_BYTES) fail('GITHUB_RESPONSE_INVALID');

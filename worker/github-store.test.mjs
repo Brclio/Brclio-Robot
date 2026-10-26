@@ -21,7 +21,7 @@ function fixture(options = {}) {
   };
   const fetchImpl = async (url, init) => {
     const parsed = new URL(url); calls.push({ url: parsed, ...init });
-    assert.equal(parsed.origin, 'https://api.github.com'); assert.equal(init.redirect, 'error'); assert.equal(init.cache, 'no-store');
+    assert.equal(parsed.origin, 'https://api.github.com'); assert.equal(init.redirect, 'manual'); assert.equal(init.cache, 'no-store');
     assert.ok(init.signal instanceof AbortSignal);
     if (parsed.pathname.endsWith('/access_tokens')) {
       issued++;
@@ -189,4 +189,25 @@ test('oversized GitHub responses are bounded before JSON or account data process
   assert.equal(f.count('/contents/'), 0);
   const streamed = fixture({ data: () => new Response(' '.repeat(1_500_001)) });
   await assert.rejects(streamed.store.read(PATH), error => error.code === 'GITHUB_RESPONSE_INVALID');
+});
+
+test('Worker-compatible manual redirects reject every 3xx before reading bodies and never forward credentials', async () => {
+  for (const status of [301, 302, 303, 304, 307, 308]) {
+    let reads = 0;
+    const f = fixture({ data: () => {
+      const response = new Response(status === 304 ? null : 'private redirect body', { status, headers: { Location: 'https://untrusted.example/receive-token' } });
+      if (response.body) {
+        const getReader = response.body.getReader.bind(response.body);
+        response.body.getReader = (...args) => { reads++; return getReader(...args); };
+      }
+      return response;
+    } });
+    await assert.rejects(f.store.read(PATH), error => error.code === 'GITHUB_REDIRECT');
+    assert.equal(reads, 0); assert.equal(f.count('/contents/'), 1);
+    assert.ok(f.calls.every(call => call.redirect === 'manual' && call.url.origin === 'https://api.github.com'));
+    assert.equal(f.calls.at(-1).signal.aborted, true);
+  }
+  const tokenRedirect = fixture({ token: () => new Response(null, { status: 307, headers: { Location: 'https://untrusted.example/receive-jwt' } }) });
+  await assert.rejects(tokenRedirect.store.read(PATH), error => error.code === 'GITHUB_REDIRECT');
+  assert.equal(tokenRedirect.calls.length, 1);
 });
